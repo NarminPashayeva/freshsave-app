@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "FreshSave",
+    "slug": "freshsave-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "az.freshsave.app"
+    },
+    "android": {
+      "package": "az.freshsave.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "scheme": "freshsave",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

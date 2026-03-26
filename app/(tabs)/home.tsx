@@ -173,9 +173,10 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, color: Colors.black },
   chips: { paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, gap: Spacing.sm },
   chip: {
-    paddingHorizontal: 16, paddingVertical: 8,
+    paddingHorizontal: 16, height: 36,
     borderRadius: Radius.full, borderWidth: 1,
     borderColor: Colors.gray200, backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
   },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
   chipText: { fontSize: 13, fontWeight: '500', color: Colors.gray600 },

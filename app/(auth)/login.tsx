@@ -6,6 +6,7 @@ import {
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '../../src/store/authStore';
+import { getErrorMessage } from '../../src/services/api';
 import { Colors, Spacing, Radius } from '../../src/utils/theme';
 
 export default function LoginScreen() {
@@ -23,9 +24,9 @@ export default function LoginScreen() {
     try {
       await login(email.trim().toLowerCase(), password);
       router.replace('/(tabs)/home');
-    } catch (e: any) {
-      const msg = e?.response?.data?.detail || 'Invalid email or password';
-      Toast.show({ type: 'error', text1: msg });
+    } catch (e) {
+      console.error('[login] API error:', JSON.stringify((e as any)?.response?.data ?? (e as any)?.message));
+      Toast.show({ type: 'error', text1: getErrorMessage(e, 'Invalid email or password') });
     } finally {
       setLoading(false);
     }

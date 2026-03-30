@@ -86,6 +86,35 @@ export const notificationsAPI = {
 
 export default api;
 
+/**
+ * Extract a human-readable message from any Axios error.
+ * Use this in catch blocks across all screens.
+ */
+export function getErrorMessage(e: unknown, fallback = 'Something went wrong'): string {
+  const err = e as any;
+  // No response at all = network/timeout issue
+  if (!err?.response) {
+    if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+      return "Can't reach the server. Make sure the backend is running and your IP in .env is correct.";
+    }
+    return 'Network error — check your connection and try again.';
+  }
+  const data = err.response?.data;
+  if (!data) return `Server error (${err.response?.status})`;
+  if (typeof data === 'string') return data;
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    const { detail, non_field_errors, ...fields } = data as Record<string, unknown>;
+    if (detail) return String(detail);
+    if (non_field_errors) return Array.isArray(non_field_errors) ? non_field_errors.join(' ') : String(non_field_errors);
+    // Field errors: "email: already exists. password: too short."
+    const parts = Object.entries(fields).map(([k, v]) =>
+      `${k}: ${Array.isArray(v) ? v.join(' ') : v}`
+    );
+    if (parts.length) return parts.join(' ');
+  }
+  return fallback;
+}
+
 // ── Payload types ─────────────────────────────────────────────────────────────
 export interface RegisterPayload {
   full_name: string;

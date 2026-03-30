@@ -6,6 +6,7 @@ import {
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '../../src/store/authStore';
+import { getErrorMessage } from '../../src/services/api';
 import { Colors, Spacing, Radius } from '../../src/utils/theme';
 
 type FormKey = 'full_name' | 'email' | 'phone' | 'password' | 'password2';
@@ -66,24 +67,22 @@ export default function RegisterScreen() {
       await register({ ...form, role: 'customer', email: form.email.trim().toLowerCase() });
       router.replace('/(tabs)/home');
     } catch (e: any) {
-      console.error('[register] API error:', JSON.stringify(e?.response?.data ?? e?.message));
+      console.error('[register] API error:', JSON.stringify((e as any)?.response?.data ?? (e as any)?.message));
 
-      const data = e?.response?.data;
+      const data = (e as any)?.response?.data;
       const parsed = parseApiErrors(data);
+      const fieldKeys = Object.keys(parsed).filter(k => k !== 'non_field_errors' && k !== 'detail');
 
-      if (Object.keys(parsed).length > 0) {
-        // Show field-level errors inline; bubble up any non-field errors as a toast
+      if (fieldKeys.length > 0) {
+        // Show per-field errors inline
         const { non_field_errors, detail, ...fieldMap } = parsed;
         setFieldErrors(fieldMap);
         if (non_field_errors || detail) {
           Toast.show({ type: 'error', text1: non_field_errors ?? detail });
         }
-      } else if (typeof data === 'string' && data) {
-        Toast.show({ type: 'error', text1: data });
-      } else if (!e?.response) {
-        Toast.show({ type: 'error', text1: 'Network error — check your connection' });
       } else {
-        Toast.show({ type: 'error', text1: `Registration failed (${e?.response?.status ?? 'unknown error'})` });
+        // Fallback: use shared parser for network/timeout/generic errors
+        Toast.show({ type: 'error', text1: getErrorMessage(e, 'Registration failed') });
       }
     } finally {
       setLoading(false);

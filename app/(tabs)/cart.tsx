@@ -4,6 +4,7 @@ import {
 import { router } from 'expo-router';
 import { useState } from 'react';
 import Toast from 'react-native-toast-message';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useCartStore } from '../../src/store/cartStore';
 import { ordersAPI } from '../../src/services/api';
@@ -25,6 +26,7 @@ export default function CartScreen() {
       }));
       const { data } = await ordersAPI.create(orderItems);
       clearCart();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Toast.show({ type: 'success', text1: 'Order placed!', text2: 'Head to the store for pickup.' });
       router.push(`/order/${data.order.id}`);
     } catch (e: any) {

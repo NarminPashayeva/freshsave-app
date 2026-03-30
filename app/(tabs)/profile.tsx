@@ -41,9 +41,9 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         {[
-          { icon: 'person-outline', label: 'Edit profile', onPress: () => {} },
-          { icon: 'lock-closed-outline', label: 'Change password', onPress: () => {} },
-          { icon: 'notifications-outline', label: 'Notifications', onPress: () => {} },
+          { icon: 'person-outline', label: 'Edit profile', onPress: () => router.push('/edit-profile') },
+          { icon: 'lock-closed-outline', label: 'Change password', onPress: () => router.push('/(auth)/forgot-password') },
+          { icon: 'notifications-outline', label: 'Notifications', onPress: () => router.push('/notifications') },
         ].map(({ icon, label, onPress }) => (
           <MenuItem key={label} icon={icon} label={label} onPress={onPress} />
         ))}

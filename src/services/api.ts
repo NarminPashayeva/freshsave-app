@@ -1,11 +1,10 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// ── Change this to your computer's local IP when testing on a real phone
-// ── On Windows: run `ipconfig` in CMD and look for IPv4 Address
-// ── Example: 'http://192.168.1.45:8000'
-// ── On emulator/simulator: 'http://10.0.2.2:8000' (Android) or 'http://localhost:8000' (iOS sim)
-export const API_BASE_URL = 'http://192.168.88.122:8000';
+// Set EXPO_PUBLIC_API_URL in your .env file
+// Example: EXPO_PUBLIC_API_URL=http://192.168.1.45:8000
+// Find your local IP with `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
@@ -33,7 +32,9 @@ api.interceptors.response.use(
         await SecureStore.setItemAsync('access_token', data.access);
         original.headers.Authorization = `Bearer ${data.access}`;
         return api(original);
-      } catch {
+      } catch (refreshError) {
+        // Refresh failed — clear tokens and let the app redirect to login
+        console.warn('[api] Token refresh failed, clearing session:', refreshError);
         await SecureStore.deleteItemAsync('access_token');
         await SecureStore.deleteItemAsync('refresh_token');
       }
@@ -44,25 +45,26 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authAPI = {
-  register: (data: any) => api.post('/auth/register/', data),
+  register: (data: RegisterPayload) => api.post('/auth/register/', data),
   login: (email: string, password: string) =>
     api.post('/auth/login/', { email, password }),
   logout: (refresh: string) => api.post('/auth/logout/', { refresh }),
   getProfile: () => api.get('/auth/profile/'),
-  updateProfile: (data: any) => api.patch('/auth/profile/', data),
+  updateProfile: (data: UpdateProfilePayload) => api.patch('/auth/profile/', data),
+  forgotPassword: (email: string) => api.post('/auth/password-reset/', { email }),
 };
 
 // ── Stores ────────────────────────────────────────────────────────────────────
 export const storesAPI = {
-  list: (params?: any) => api.get('/stores/', { params }),
+  list: (params?: StoreListParams) => api.get('/stores/', { params }),
   detail: (id: string) => api.get(`/stores/${id}/`),
   reviews: (id: string) => api.get(`/stores/${id}/reviews/`),
-  addReview: (id: string, data: any) => api.post(`/stores/${id}/reviews/`, data),
+  addReview: (id: string, data: ReviewPayload) => api.post(`/stores/${id}/reviews/`, data),
 };
 
 // ── Listings ──────────────────────────────────────────────────────────────────
 export const listingsAPI = {
-  list: (params?: any) => api.get('/listings/', { params }),
+  list: (params?: Record<string, unknown>) => api.get('/listings/', { params }),
   storeFeed: (storeId: string) => api.get(`/listings/store/${storeId}/`),
   detail: (id: string) => api.get(`/listings/${id}/`),
 };
@@ -83,3 +85,29 @@ export const notificationsAPI = {
 };
 
 export default api;
+
+// ── Payload types ─────────────────────────────────────────────────────────────
+export interface RegisterPayload {
+  full_name: string;
+  email: string;
+  phone?: string;
+  password: string;
+  password2: string;
+  role: string;
+}
+
+export interface UpdateProfilePayload {
+  full_name?: string;
+  phone?: string;
+  avatar?: string;
+}
+
+export interface ReviewPayload {
+  rating: number;
+  comment: string;
+}
+
+export interface StoreListParams {
+  search?: string;
+  category?: string;
+}

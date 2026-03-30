@@ -7,6 +7,7 @@ export interface CartItem {
   store_name: string;
   original_price: number;
   discounted_price: number;
+  available_qty?: number; // stock limit from the listing
   quantity: number;
   image: string | null;
 }
@@ -35,6 +36,9 @@ export const useCartStore = create<CartState>((set, get) => ({
       return;
     }
     if (existing) {
+      // Respect stock limit
+      const max = item.available_qty ?? Infinity;
+      if (existing.quantity >= max) return;
       set({ items: get().items.map(i =>
         i.listing_id === item.listing_id
           ? { ...i, quantity: i.quantity + 1 }
@@ -53,8 +57,11 @@ export const useCartStore = create<CartState>((set, get) => ({
       get().removeItem(listing_id);
       return;
     }
+    const item = get().items.find(i => i.listing_id === listing_id);
+    const max = item?.available_qty ?? Infinity;
+    const clamped = Math.min(quantity, max);
     set({ items: get().items.map(i =>
-      i.listing_id === listing_id ? { ...i, quantity } : i
+      i.listing_id === listing_id ? { ...i, quantity: clamped } : i
     )});
   },
 

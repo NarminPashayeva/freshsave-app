@@ -13,10 +13,16 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
 
+  const TERMINAL = ['collected', 'cancelled', 'expired'];
+
   const { data, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersAPI.detail(id),
-    refetchInterval: 15000, // poll every 15s for status updates
+    // Stop polling once order reaches a final state
+    refetchInterval: (query) => {
+      const status = (query.state.data as any)?.data?.status;
+      return TERMINAL.includes(status) ? false : 15000;
+    },
   });
 
   const order = data?.data;

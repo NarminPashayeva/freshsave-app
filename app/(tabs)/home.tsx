@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput,
   TouchableOpacity, FlatList, Image, RefreshControl, ActivityIndicator,
@@ -9,24 +10,36 @@ import { storesAPI } from '../../src/services/api';
 import { useAuthStore } from '../../src/store/authStore';
 import { Colors, Spacing, Radius } from '../../src/utils/theme';
 import { API_BASE_URL } from '../../src/services/api';
-import dayjs from 'dayjs';
+import { StoreSkeleton } from '../../src/components/Skeleton';
 
 const CATEGORIES = ['All', 'Bakery', 'Café', 'Pastry', 'Sandwich'];
 
 export default function HomeScreen() {
   const user = useAuthStore(s => s.user);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('All');
 
+  // Debounce search input — wait 400ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['stores', category, search],
+    queryKey: ['stores', category, debouncedSearch],
     queryFn: () => storesAPI.list({
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       category: category !== 'All' ? category.toLowerCase() : undefined,
     }),
   });
 
   const stores = data?.data?.results || data?.data || [];
+
+  const sectionLabel = () => {
+    if (category !== 'All') return `${stores.length} ${category} store${stores.length !== 1 ? 's' : ''} found`;
+    return `${stores.length} store${stores.length !== 1 ? 's' : ''} available ${getTimeOfDay() === 'morning' || getTimeOfDay() === 'afternoon' ? 'today' : 'tonight'}`;
+  };
 
   return (
     <View style={styles.container}>
@@ -53,6 +66,11 @@ export default function HomeScreen() {
           value={search}
           onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Ionicons name="close-circle" size={18} color={Colors.gray400} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Category chips */}
@@ -75,7 +93,10 @@ export default function HomeScreen() {
 
       {/* Store list */}
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={Colors.primary} size="large" />
+        <ScrollView contentContainerStyle={styles.list}>
+          <Text style={styles.sectionTitle}>Loading stores…</Text>
+          {[1, 2, 3].map(i => <StoreSkeleton key={i} />)}
+        </ScrollView>
       ) : (
         <FlatList
           data={stores}
@@ -85,9 +106,7 @@ export default function HomeScreen() {
             <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />
           }
           ListHeaderComponent={
-            <Text style={styles.sectionTitle}>
-              {stores.length} stores available tonight
-            </Text>
+            <Text style={styles.sectionTitle}>{sectionLabel()}</Text>
           }
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -103,7 +122,8 @@ export default function HomeScreen() {
 }
 
 function StoreCard({ store }: { store: any }) {
-  const discount = 50; // default, refine with listing data
+  // Use actual max discount from API if available, otherwise skip the badge
+  const discount = store.max_discount_pct ?? store.discount_pct ?? null;
   return (
     <TouchableOpacity
       style={styles.card}
@@ -115,9 +135,11 @@ function StoreCard({ store }: { store: any }) {
           ? <Image source={{ uri: `${API_BASE_URL}${store.logo}` }} style={StyleSheet.absoluteFill} />
           : <Text style={styles.cardEmoji}>{getCategoryEmoji(store.category)}</Text>
         }
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>Up to {discount}% off</Text>
-        </View>
+        {discount != null && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>Up to {discount}% off</Text>
+          </View>
+        )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardName}>{store.name}</Text>
@@ -148,9 +170,6 @@ function getTimeOfDay() {
   if (h < 17) return 'afternoon';
   return 'evening';
 }
-
-// Need useState import
-import { useState } from 'react';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray50 },

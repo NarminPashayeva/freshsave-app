@@ -8,35 +8,83 @@ import Toast from 'react-native-toast-message';
 import { useAuthStore } from '../../src/store/authStore';
 import { Colors, Spacing, Radius } from '../../src/utils/theme';
 
+type FormKey = 'full_name' | 'email' | 'phone' | 'password' | 'password2';
+
+const FIELDS: {
+  key: FormKey;
+  label: string;
+  placeholder: string;
+  keyboard?: 'email-address' | 'phone-pad';
+  secure?: boolean;
+}[] = [
+  { key: 'full_name',  label: 'Full name *',        placeholder: 'Amir Mammadov' },
+  { key: 'email',      label: 'Email *',             placeholder: 'your@email.com', keyboard: 'email-address' },
+  { key: 'phone',      label: 'Phone',               placeholder: '+994 50 123 45 67', keyboard: 'phone-pad' },
+  { key: 'password',   label: 'Password *',          placeholder: 'Min. 8 characters', secure: true },
+  { key: 'password2',  label: 'Confirm password *',  placeholder: 'Repeat password', secure: true },
+];
+
+/** Parse Django REST Framework error responses into a field→message map */
+function parseApiErrors(data: unknown): Record<string, string> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (Array.isArray(value)) result[key] = value.join(' ');
+    else if (typeof value === 'string') result[key] = value;
+  }
+  return result;
+}
+
 export default function RegisterScreen() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<Record<FormKey, string>>({
     full_name: '', email: '', phone: '', password: '', password2: '',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const register = useAuthStore(s => s.register);
 
-  const set = (key: string, value: string) =>
+  const updateField = (key: FormKey, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
+    // Clear the error for this field as the user types
+    if (fieldErrors[key]) setFieldErrors(prev => ({ ...prev, [key]: '' }));
+  };
 
   const handleRegister = async () => {
+    setFieldErrors({});
+
     if (!form.full_name || !form.email || !form.password || !form.password2) {
       Toast.show({ type: 'error', text1: 'Please fill in all required fields' });
       return;
     }
     if (form.password !== form.password2) {
-      Toast.show({ type: 'error', text1: 'Passwords do not match' });
+      setFieldErrors({ password2: 'Passwords do not match' });
       return;
     }
+
     setLoading(true);
     try {
       await register({ ...form, role: 'customer', email: form.email.trim().toLowerCase() });
       router.replace('/(tabs)/home');
     } catch (e: any) {
-      const errors = e?.response?.data;
-      const msg = typeof errors === 'object'
-        ? Object.values(errors).flat().join(' ')
-        : 'Registration failed';
-      Toast.show({ type: 'error', text1: msg });
+      console.error('[register] API error:', JSON.stringify(e?.response?.data ?? e?.message));
+
+      const data = e?.response?.data;
+      const parsed = parseApiErrors(data);
+
+      if (Object.keys(parsed).length > 0) {
+        // Show field-level errors inline; bubble up any non-field errors as a toast
+        const { non_field_errors, detail, ...fieldMap } = parsed;
+        setFieldErrors(fieldMap);
+        if (non_field_errors || detail) {
+          Toast.show({ type: 'error', text1: non_field_errors ?? detail });
+        }
+      } else if (typeof data === 'string' && data) {
+        Toast.show({ type: 'error', text1: data });
+      } else if (!e?.response) {
+        Toast.show({ type: 'error', text1: 'Network error — check your connection' });
+      } else {
+        Toast.show({ type: 'error', text1: `Registration failed (${e?.response?.status ?? 'unknown error'})` });
+      }
     } finally {
       setLoading(false);
     }
@@ -56,25 +104,22 @@ export default function RegisterScreen() {
         <Text style={styles.subtitle}>Join thousands saving food and money</Text>
 
         <View style={styles.form}>
-          {[
-            { key: 'full_name', label: 'Full name *', placeholder: 'Amir Mammadov' },
-            { key: 'email', label: 'Email *', placeholder: 'your@email.com', keyboard: 'email-address' as any },
-            { key: 'phone', label: 'Phone', placeholder: '+994 50 123 45 67', keyboard: 'phone-pad' as any },
-            { key: 'password', label: 'Password *', placeholder: 'Min. 8 characters', secure: true },
-            { key: 'password2', label: 'Confirm password *', placeholder: 'Repeat password', secure: true },
-          ].map(({ key, label, placeholder, keyboard, secure }) => (
+          {FIELDS.map(({ key, label, placeholder, keyboard, secure }) => (
             <View key={key} style={styles.field}>
               <Text style={styles.label}>{label}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors[key] ? styles.inputError : null]}
                 placeholder={placeholder}
                 placeholderTextColor={Colors.gray400}
-                keyboardType={keyboard || 'default'}
+                keyboardType={keyboard ?? 'default'}
                 autoCapitalize={key === 'email' ? 'none' : 'words'}
                 secureTextEntry={secure}
-                value={(form as any)[key]}
-                onChangeText={(v) => set(key, v)}
+                value={form[key]}
+                onChangeText={(v) => updateField(key, v)}
               />
+              {fieldErrors[key] ? (
+                <Text style={styles.fieldErrorText}>{fieldErrors[key]}</Text>
+              ) : null}
             </View>
           ))}
 
@@ -118,6 +163,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingVertical: 14,
     fontSize: 15, color: Colors.black, backgroundColor: Colors.gray50,
   },
+  inputError: { borderColor: Colors.danger },
+  fieldErrorText: { fontSize: 12, color: Colors.danger, marginTop: 2 },
   btn: {
     backgroundColor: Colors.primary, borderRadius: Radius.md,
     paddingVertical: 16, alignItems: 'center', marginTop: Spacing.sm,
